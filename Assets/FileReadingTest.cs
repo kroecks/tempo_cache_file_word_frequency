@@ -1,13 +1,14 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
+using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
 
 public class FileReadingTest : MonoBehaviour
 {
-    private static string FILE_DIRECTORY = Path.Combine(Application.dataPath, "TestData");
-    private static string FILE_PATH = Path.Combine(FILE_DIRECTORY,"TestData.txt");
+    private static readonly string FILE_PATH = "TestData/TestData";
+    private static readonly Regex ALPHABET_FILTER = new Regex("[^a-zA-Z]");
     
     private Dictionary<string, int> _frequencyTable;
 
@@ -21,6 +22,7 @@ public class FileReadingTest : MonoBehaviour
         StartCoroutine(CacheFile());
     }
 
+    // This function is the user saying they're ready to lookup the frequency
     public void PerformSearch()
     {
         if (TextInput == null || TextInput.text.Length == 0)
@@ -40,7 +42,6 @@ public class FileReadingTest : MonoBehaviour
     public void CheckWord(string checkedWord)
     {
         var lowerS = checkedWord.ToLower();
-        
         int foundCount = 0;
         if (_frequencyTable.TryGetValue(lowerS, out var curCount))
         {
@@ -63,6 +64,7 @@ public class FileReadingTest : MonoBehaviour
             }
             
             var lowerVal = rawString.ToLower();
+            lowerVal = ALPHABET_FILTER.Replace(lowerVal, String.Empty);
             
             // If it doesn't exist, explicitly initialize it
             if (!_frequencyTable.TryGetValue(lowerVal, out var currentVal))
@@ -90,28 +92,30 @@ public class FileReadingTest : MonoBehaviour
         }
     }
 
+    // Assuming we had multiple files or super long text, IEnumerator would allow us to handle it async and defer from the main thread
     IEnumerator CacheFile()
     {
-        if (!Directory.Exists(FILE_DIRECTORY))
+        // We're going to use the Resources system, since we want this file to be included in the build
+        // If we were reading files from disc, we'd typically use the Directory and File functionalities
+        // But since we want to make sure it's packaged in unity's bundle, we're using Resources.Load
+        var loaded = Resources.Load<TextAsset>(FILE_PATH);
+        if (loaded == null)
         {
-            Debug.LogError("Failed to locate file directory! " + FILE_DIRECTORY);
+            Debug.LogError("Cannot find the file specified!");
             yield break;
         }
-
+        
+        // Reset the frequency table
         _frequencyTable = new();
 
-        using (var stream = File.OpenText(FILE_PATH))
-        {
-            while (!stream.EndOfStream)
-            {
-                var currentLine = stream.ReadLine();
-                ParseLine(currentLine);
-            }
-        }
-        
+        var text = loaded.text;
+        ParseLine(text);
+
         if (WordCountText)
         {
             WordCountText.text = $"Total Words: {_frequencyTable.Count}";
         }
+
+        yield return 0;
     }
 }
